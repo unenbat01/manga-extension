@@ -1,0 +1,41 @@
+#manga-translator-tooltip {
+  position: fixed !important;
+  z-index: 999999 !important;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  max-width: 250px;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mt-word {
+  font-weight: 700;
+  color: #89b4fa;
+  font-size: 15px;
+}
+
+.mt-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 6px 0;
+}
+
+.mt-trans {
+  color: #a6adc8;
+  font-size: 14px;
+}
+
+.mt-loading {
+  color: #f9e2af;
+  font-size: 12px;
+}
+
+.mt-error {
+  color: #f38ba8;
+  font-size: 12px;
+}

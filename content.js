@@ -119,7 +119,7 @@ function showResultTooltip(original, translation, x, y) {
 
   autoHideTimer = setTimeout(() => {
     el.style.display = "none";
-  }, 3000);
+  }, 1500);
 }
 
 function showErrorTooltip(msg, x, y) {
@@ -132,7 +132,7 @@ function showErrorTooltip(msg, x, y) {
 
   autoHideTimer = setTimeout(() => {
     el.style.display = "none";
-  }, 3000);
+  }, 1500);
 }
 
 function getOrCreateTooltip() {

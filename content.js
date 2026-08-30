@@ -1,7 +1,15 @@
 let autoHideTimer = null;
 
+// Хуудас ачаалагдахад зүүн дээд UI-г үүсгэнэ
+injectTopBoxUI();
+
 document.addEventListener("click", async (e) => {
-  if (e.target.closest("#manga-translator-tooltip")) return;
+  // Дээд UI эсвэл Tooltip дээр дарахад OCR ажиллахгүй
+  if (
+    e.target.closest("#manga-translator-tooltip") ||
+    e.target.closest("#manga-translator-topbox")
+  )
+    return;
 
   const clickX = e.clientX;
   const clickY = e.clientY;
@@ -29,6 +37,56 @@ document.addEventListener("click", async (e) => {
     }
   );
 });
+
+// Зүүн дээд буланд байрлах UI
+function injectTopBoxUI() {
+  if (document.getElementById("manga-translator-topbox")) return;
+
+  const box = document.createElement("div");
+  box.id = "manga-translator-topbox";
+  box.innerHTML = `
+    <textarea id="mt-text-input" placeholder="Англи текст эсвэл өгүүлбэр бичих..."></textarea>
+    <div class="mt-topbox-row">
+      <button id="mt-translate-btn">Орчуулах</button>
+    </div>
+    <div id="mt-text-result" style="display: none;"></div>
+  `;
+  document.body.appendChild(box);
+
+  const btn = box.querySelector("#mt-translate-btn");
+  const input = box.querySelector("#mt-text-input");
+  const resultDiv = box.querySelector("#mt-text-result");
+
+  btn.addEventListener("click", () => {
+    const text = input.value.trim();
+    if (!text) return;
+
+    btn.innerText = "Уншиж байна...";
+    btn.disabled = true;
+
+    chrome.runtime.sendMessage(
+      { action: "TRANSLATE_TEXT", text: text },
+      (res) => {
+        btn.innerText = "Орчуулах";
+        btn.disabled = false;
+        if (res && res.success) {
+          resultDiv.innerText = res.translation;
+          resultDiv.style.display = "block";
+        } else {
+          resultDiv.innerText = "Орчуулахад алдаа гарлаа";
+          resultDiv.style.display = "block";
+        }
+      }
+    );
+  });
+
+  // Ctrl+Enter эсвэл Cmd+Enter дарахад шууд орчуулна
+  input.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      btn.click();
+    }
+  });
+}
 
 function resetTimer() {
   if (autoHideTimer) {
@@ -59,10 +117,9 @@ function showResultTooltip(original, translation, x, y) {
   `;
   el.style.display = "block";
 
-  // 3 секундын дараа автоматаар нуух
   autoHideTimer = setTimeout(() => {
     el.style.display = "none";
-  }, 2000);
+  }, 3000);
 }
 
 function showErrorTooltip(msg, x, y) {

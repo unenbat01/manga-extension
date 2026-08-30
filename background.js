@@ -8,7 +8,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     return true;
   }
+
+  if (request.action === "TRANSLATE_TEXT") {
+    translateText(request.text)
+      .then((translation) => sendResponse({ success: true, translation }))
+      .catch((err) => {
+        console.error("Translation Error:", err);
+        sendResponse({ success: false, error: err.message });
+      });
+    return true;
+  }
 });
+
+async function translateText(text) {
+  const transUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=mn&dt=t&q=${encodeURIComponent(
+    text
+  )}`;
+  const transRes = await fetch(transUrl);
+  const transData = await transRes.json();
+  return transData[0].map((x) => x[0]).join("");
+}
 
 async function ensureOffscreenDocument() {
   const existingContexts = await chrome.runtime.getContexts({
@@ -45,14 +64,7 @@ async function handleProcess(data, windowId) {
   }
 
   const targetWord = ocrResponse.text;
-
-  // Google Translate API
-  const transUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=mn&dt=t&q=${encodeURIComponent(
-    targetWord.toLowerCase()
-  )}`;
-  const transRes = await fetch(transUrl);
-  const transData = await transRes.json();
-  const translation = transData[0].map((x) => x[0]).join("");
+  const translation = await translateText(targetWord.toLowerCase());
 
   return { original: targetWord, translation };
 }

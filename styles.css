@@ -3,14 +3,62 @@
   position: fixed !important;
   top: 16px !important;
   left: 16px !important;
-  z-index: 999999 !important;
+  z-index: 2147483646 !important;
   background: #1e1e2e;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px 12px 12px;
   width: 260px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.mt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mt-title {
+  color: #cdd6f4;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.mt-head-btns {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+#mt-power {
+  background: transparent;
+  border: none;
+  color: #a6e3a1;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+#mt-power.mt-off {
+  color: #6c7086;
+}
+
+#mt-collapse {
+  background: transparent;
+  border: none;
+  color: #6c7086;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+#mt-collapse:hover {
+  color: #cdd6f4;
 }
 
 #mt-text-input {
@@ -33,8 +81,24 @@
 
 .mt-topbox-row {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 8px;
+}
+
+.mt-check {
+  color: #6c7086;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mt-check input {
+  margin: 0;
+  accent-color: #89b4fa;
 }
 
 #mt-translate-btn {
@@ -70,10 +134,25 @@
   white-space: pre-wrap;
 }
 
-/* Товшиж орчуулах tooltip загвар */
+.mt-hint {
+  margin-top: 8px;
+  color: #585b70;
+  font-size: 10px;
+}
+
+/* Shift+чирэх үед гарах сонголтын хүрээ */
+#manga-translator-dragbox {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  border: 2px dashed #89b4fa;
+  background: rgba(137, 180, 250, 0.12);
+  pointer-events: none;
+}
+
+/* Товшиж орчуулах tooltip */
 #manga-translator-tooltip {
   position: fixed !important;
-  z-index: 999999 !important;
+  z-index: 2147483647 !important;
   background: #1e1e2e;
   color: #cdd6f4;
   padding: 10px 14px;
@@ -81,9 +160,9 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
-  max-width: 250px;
-  pointer-events: none;
+  max-width: 300px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  user-select: text;
 }
 
 .mt-word {
@@ -99,8 +178,36 @@
 }
 
 .mt-trans {
-  color: #a6adc8;
+  color: #cdd6f4;
   font-size: 14px;
+  line-height: 1.35;
+}
+
+.mt-alts {
+  margin-top: 5px;
+  color: #a6adc8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mt-context {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mt-context-en {
+  color: #585b70;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.3;
+}
+
+.mt-context-mn {
+  margin-top: 3px;
+  color: #94e2d5;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .mt-loading {

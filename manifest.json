@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Manga Click Translator v4",
-  "version": "4.0",
-  "permissions": ["activeTab", "scripting", "offscreen"],
+  "name": "Manga Click Translator v5",
+  "version": "5.0",
+  "permissions": ["activeTab", "scripting", "offscreen", "storage"],
   "host_permissions": [
     "<all_urls>",
     "https://translate.googleapis.com/*",
     "https://cdn.jsdelivr.net/*",
+    "https://tessdata.projectnaptha.com/*",
     "https://api.datamuse.com/*"
   ],
   "content_security_policy": {
@@ -29,7 +30,8 @@
     {
       "matches": ["<all_urls>"],
       "css": ["styles.css"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "all_frames": false
     }
   ]
 }

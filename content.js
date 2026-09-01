@@ -1,11 +1,15 @@
 const HIDE_DELAY_MS = 3000; // Хариу гарснаас хойш өөрөө алга болох хугацаа
 const SCROLL_HIDE_PX = 60; // Ийм зайд гүйлгэхэд popover алга болно
 const SETTINGS_KEY = "mtSettings";
+const HISTORY_KEY = "mtHistory";
+const HISTORY_MAX = 500; // Хадгалах үгийн дээд тоо (PDF-д бүгд орно)
 
 const state = {
   enabled: true,
   altOnly: false, // Зөвхөн Alt+click дарахад ажиллах
   collapsed: false,
+  histCollapsed: false,
+  panels: {}, // { topbox|history: { left, top, width, height } }
   reqId: 0, // Хоцорсон хариуг үл хэрэгсэхэд
   hideTimer: null,
   warmedUp: false,
@@ -14,6 +18,7 @@ const state = {
 let dragStart = null;
 let dragBox = null;
 let scrollAnchor = null; // { win, els } — popover гарах үеийн гүйлгэлтийн байрлал
+let history = []; // [{ w, t }] — сүүлд орчуулсан үгс
 
 init();
 
@@ -24,7 +29,20 @@ async function init() {
     .catch(() => null);
   if (stored) Object.assign(state, stored);
 
+  history = await chrome.storage.local
+    .get(HISTORY_KEY)
+    .then((o) => o[HISTORY_KEY] || [])
+    .catch(() => []);
+
   injectTopBoxUI();
+  injectHistoryUI();
+
+  // Өөр таб дээр орчуулсан үг энд ч шинэчлэгдэнэ
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !changes[HISTORY_KEY]) return;
+    history = changes[HISTORY_KEY].newValue || [];
+    renderHistory();
+  });
 
   document.addEventListener("mousedown", onMouseDown, true);
   document.addEventListener("mousemove", onMouseMove, true);
@@ -38,6 +56,8 @@ async function init() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") hideTooltip();
   });
+  window.addEventListener("resize", clampPanels);
+  document.addEventListener("pointerdown", onPanelPointerDown, true);
 }
 
 function saveSettings() {
@@ -47,6 +67,8 @@ function saveSettings() {
         enabled: state.enabled,
         altOnly: state.altOnly,
         collapsed: state.collapsed,
+        histCollapsed: state.histCollapsed,
+        panels: state.panels,
       },
     })
     .catch(() => {});
@@ -68,7 +90,8 @@ function isOurUI(el) {
     el &&
     el.closest &&
     (el.closest("#manga-translator-tooltip") ||
-      el.closest("#manga-translator-topbox"))
+      el.closest("#manga-translator-topbox") ||
+      el.closest("#manga-translator-history"))
   );
 }
 
@@ -286,8 +309,9 @@ function injectTopBoxUI() {
   box.id = "manga-translator-topbox";
   box.innerHTML = `
     <div class="mt-head">
-      <span class="mt-title">Орчуулагч</span>
+      <span class="mt-title"><span class="mt-grip">⠿</span> Орчуулагч</span>
       <span class="mt-head-btns">
+        <button class="mt-corner" title="Булан солих (↖ ↗ ↘ ↙)">↖</button>
         <button id="mt-power" title="Товшиж орчуулахыг сэлгэх">⏻</button>
         <button id="mt-collapse" title="Хумих">–</button>
       </span>
@@ -328,6 +352,8 @@ function injectTopBoxUI() {
     saveSettings();
   });
 
+  makePanelInteractive(box, "topbox");
+
   altOnly.checked = state.altOnly;
   altOnly.addEventListener("change", () => {
     state.altOnly = altOnly.checked;
@@ -335,8 +361,12 @@ function injectTopBoxUI() {
   });
 
   const applyCollapsed = () => {
-    body.style.display = state.collapsed ? "none" : "block";
+    body.style.display = state.collapsed ? "none" : "flex";
     collapse.innerText = state.collapsed ? "+" : "–";
+    // Хумсан үед тогтоосон өндөр хоосон хайрцаг үлдээхээс сэргийлнэ
+    const saved = state.panels.topbox;
+    box.style.height =
+      state.collapsed || !saved || !saved.height ? "" : saved.height + "px";
   };
   applyCollapsed();
   collapse.addEventListener("click", () => {
@@ -344,6 +374,8 @@ function injectTopBoxUI() {
     applyCollapsed();
     saveSettings();
   });
+
+  let lastTranslated = null; // Одоо үр дүн нь харагдаж буй текст
 
   const translate = () => {
     const text = input.value.trim();
@@ -356,13 +388,28 @@ function injectTopBoxUI() {
       btn.innerText = "Орчуулах";
       btn.disabled = false;
       resultDiv.style.display = "block";
-      resultDiv.textContent =
-        res && res.success
-          ? res.data.translation
-          : "Орчуулахад алдаа гарлаа" +
-            (res && res.error ? ": " + res.error : "");
+      if (res && res.success) {
+        resultDiv.textContent = res.data.translation;
+        lastTranslated = text;
+        addHistory(text, res.data.translation);
+      } else {
+        resultDiv.textContent =
+          "Орчуулахад алдаа гарлаа" + (res && res.error ? ": " + res.error : "");
+        lastTranslated = null;
+      }
     });
   };
+
+  // Талбар дээр дарахад өмнө орчуулсан үгийг цэвэрлэнэ.
+  // Хараахан орчуулаагүй бичиж байсан текстийг арилгахгүй.
+  input.addEventListener("focus", () => {
+    if (lastTranslated !== null && input.value.trim() === lastTranslated) {
+      input.value = "";
+      resultDiv.style.display = "none";
+      resultDiv.textContent = "";
+      lastTranslated = null;
+    }
+  });
 
   btn.addEventListener("click", translate);
   input.addEventListener("keydown", (e) => {
@@ -371,6 +418,287 @@ function injectTopBoxUI() {
       translate();
     }
   });
+}
+
+// ---------- Самбарыг чирж зөөх, хэмжээг нь хадгалах ----------
+function panelState(key) {
+  if (!state.panels[key]) state.panels[key] = {};
+  return state.panels[key];
+}
+
+function applyPanelLayout(box, key) {
+  const p = state.panels[key];
+  if (!p) return;
+  if (p.left != null) {
+    box.style.left = p.left + "px";
+    box.style.right = "auto";
+  }
+  if (p.top != null) box.style.top = p.top + "px";
+  if (p.width) box.style.width = p.width + "px";
+  if (p.height) box.style.height = p.height + "px";
+  box.classList.toggle("mt-sized", !!p.height);
+}
+
+function savePanelPos(box, key) {
+  const r = box.getBoundingClientRect();
+  const p = panelState(key);
+  p.left = Math.round(r.left);
+  p.top = Math.round(r.top);
+  saveSettings();
+}
+
+// Зөвхөн хэрэглэгч өөрөө чирж томруулсан үед л (inline хэмжээ) хадгална.
+// Эс тэгвээс агуулгаас хамаарсан өндөр түгжигдэж, жагсаалт өсөхөө болино.
+function savePanelSize(box, key) {
+  const p = panelState(key);
+  let changed = false;
+  if (box.style.width) {
+    p.width = parseInt(box.style.width, 10);
+    changed = true;
+  }
+  if (box.style.height) {
+    p.height = parseInt(box.style.height, 10);
+    box.classList.add("mt-sized");
+    changed = true;
+  }
+  if (changed) saveSettings();
+}
+
+// Аль толгой аль самбарынх болохыг бүртгэнэ
+const dragPanels = new Map(); // head -> { box, key }
+
+const CORNERS = [
+  { icon: "↖", left: true, top: true },
+  { icon: "↗", left: false, top: true },
+  { icon: "↘", left: false, top: false },
+  { icon: "↙", left: true, top: false },
+];
+const CORNER_MARGIN = 16;
+
+function snapToCorner(box, key, idx) {
+  const c = CORNERS[idx];
+  const left = c.left
+    ? CORNER_MARGIN
+    : window.innerWidth - box.offsetWidth - CORNER_MARGIN;
+  const top = c.top
+    ? CORNER_MARGIN
+    : window.innerHeight - box.offsetHeight - CORNER_MARGIN;
+
+  box.style.right = "auto";
+  setViewportPos(box, Math.max(0, left), Math.max(0, top));
+  panelState(key).corner = idx;
+  savePanelPos(box, key);
+}
+
+// <body> дээр transform байвал fixed элементийн эх цэг шилждэг.
+// Тиймээс style.left-ийг харагдах байрлалтай нь тааруулж залруулна.
+function setViewportPos(box, viewLeft, viewTop) {
+  box.style.left = Math.round(viewLeft) + "px";
+  box.style.top = Math.round(viewTop) + "px";
+  const r = box.getBoundingClientRect();
+  const dx = r.left - viewLeft;
+  const dy = r.top - viewTop;
+  if (dx || dy) {
+    box.style.left = Math.round(viewLeft - dx) + "px";
+    box.style.top = Math.round(viewTop - dy) + "px";
+  }
+}
+
+function makePanelInteractive(box, key) {
+  applyPanelLayout(box, key);
+
+  const head = box.querySelector(".mt-head");
+  dragPanels.set(head, { box, key });
+
+  const corner = box.querySelector(".mt-corner");
+  if (corner) {
+    const p = state.panels[key] || {};
+    let idx = typeof p.corner === "number" ? p.corner : 0;
+    corner.innerText = CORNERS[idx].icon;
+    corner.addEventListener("click", () => {
+      idx = (idx + 1) % CORNERS.length;
+      corner.innerText = CORNERS[idx].icon;
+      snapToCorner(box, key, idx);
+    });
+  }
+
+  // Булангаас татаж хэмжээ өөрчлөхийг ажиглана
+  if (window.ResizeObserver) {
+    let t = null;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(() => savePanelSize(box, key), 400);
+    });
+    ro.observe(box);
+  }
+
+  // Толгой дээр давхар дарвал анхны байрлал/хэмжээ рүү буцаана
+  head.addEventListener("dblclick", () => {
+    delete state.panels[key];
+    box.style.left = "";
+    box.style.top = "";
+    box.style.right = "";
+    box.style.width = "";
+    box.style.height = "";
+    box.classList.remove("mt-sized");
+    saveSettings();
+  });
+}
+
+// Чирэлтийг document дээр capture фазаар барина. Зарим manhwa reader
+// pointerdown-ыг өөртөө барьж stopPropagation хийдэг тул элемент дээрх
+// listener хүртэл хүрэхгүй байх магадлалтай.
+function onPanelPointerDown(e) {
+  if (e.button !== 0 || !e.target || !e.target.closest) return;
+
+  const head = e.target.closest(".mt-head");
+  if (!head || !dragPanels.has(head)) return;
+  if (e.target.closest("button")) return;
+
+  const { box, key } = dragPanels.get(head);
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const r = box.getBoundingClientRect();
+  const offX = e.clientX - r.left;
+  const offY = e.clientY - r.top;
+  box.style.right = "auto";
+
+  const move = (ev) => {
+    const left = Math.min(
+      Math.max(0, ev.clientX - offX),
+      Math.max(0, window.innerWidth - box.offsetWidth)
+    );
+    const top = Math.min(
+      Math.max(0, ev.clientY - offY),
+      Math.max(0, window.innerHeight - box.offsetHeight)
+    );
+    setViewportPos(box, left, top);
+  };
+
+  const up = () => {
+    window.removeEventListener("pointermove", move, true);
+    window.removeEventListener("pointerup", up, true);
+    window.removeEventListener("pointercancel", up, true);
+    document.body.classList.remove("mt-dragging");
+    savePanelPos(box, key);
+  };
+
+  document.body.classList.add("mt-dragging");
+  window.addEventListener("pointermove", move, true);
+  window.addEventListener("pointerup", up, true);
+  window.addEventListener("pointercancel", up, true);
+}
+
+function clampPanels() {
+  for (const id of ["manga-translator-topbox", "manga-translator-history"]) {
+    const box = document.getElementById(id);
+    if (!box || !box.style.left) continue;
+    const left = parseInt(box.style.left, 10) || 0;
+    const top = parseInt(box.style.top, 10) || 0;
+    setViewportPos(
+      box,
+      Math.min(Math.max(0, left), Math.max(0, window.innerWidth - box.offsetWidth)),
+      Math.min(Math.max(0, top), Math.max(0, window.innerHeight - box.offsetHeight))
+    );
+  }
+}
+
+// ---------- Баруун дээд булан: сүүлд орчуулсан үгс ----------
+function injectHistoryUI() {
+  if (document.getElementById("manga-translator-history")) return;
+
+  const box = document.createElement("div");
+  box.id = "manga-translator-history";
+  box.innerHTML = `
+    <div class="mt-head">
+      <span class="mt-title"><span class="mt-grip">⠿</span> Орчуулсан үгс <span id="mt-hist-count"></span></span>
+      <span class="mt-head-btns">
+        <button class="mt-corner" title="Булан солих (↖ ↗ ↘ ↙)">↗</button>
+        <button id="mt-hist-pdf" title="Бүх үгийг PDF болгож татах">⤓</button>
+        <button id="mt-hist-clear" title="Цэвэрлэх">✕</button>
+        <button id="mt-hist-collapse" title="Хумих">–</button>
+      </span>
+    </div>
+    <div id="mt-hist-list"></div>
+  `;
+  document.body.appendChild(box);
+
+  const collapse = box.querySelector("#mt-hist-collapse");
+  const list = box.querySelector("#mt-hist-list");
+
+  makePanelInteractive(box, "history");
+
+  const applyCollapsed = () => {
+    list.style.display = state.histCollapsed ? "none" : "block";
+    collapse.innerText = state.histCollapsed ? "+" : "–";
+    const saved = state.panels.history;
+    box.style.height =
+      state.histCollapsed || !saved || !saved.height ? "" : saved.height + "px";
+  };
+  applyCollapsed();
+  collapse.addEventListener("click", () => {
+    state.histCollapsed = !state.histCollapsed;
+    applyCollapsed();
+    saveSettings();
+  });
+
+  box.querySelector("#mt-hist-pdf").addEventListener("click", () => {
+    chrome.runtime.sendMessage({ action: "OPEN_EXPORT" }).catch(() => {});
+  });
+
+  box.querySelector("#mt-hist-clear").addEventListener("click", () => {
+    history = [];
+    renderHistory();
+    chrome.storage.local.set({ [HISTORY_KEY]: history }).catch(() => {});
+  });
+
+  renderHistory();
+}
+
+// Зөвхөн ганц үгийг бүртгэнэ — өгүүлбэр, бөмбөлгийн орчуулга жагсаалтад орохгүй
+function addHistory(word, translation) {
+  const w = (word || "").trim();
+  const t = (translation || "").trim();
+  if (!w || !t || /\s/.test(w)) return;
+
+  // Давхардвал устгахгүй — хэдэн удаа хайснаа тоолж, дээш нь гаргана
+  const key = w.toLowerCase();
+  const idx = history.findIndex((h) => h.w.toLowerCase() === key);
+  let n = 1;
+  if (idx >= 0) {
+    n = (history[idx].n || 1) + 1;
+    history.splice(idx, 1);
+  }
+  history.unshift({ w, t, n });
+  if (history.length > HISTORY_MAX) history.length = HISTORY_MAX;
+
+  renderHistory();
+  chrome.storage.local.set({ [HISTORY_KEY]: history }).catch(() => {});
+}
+
+function renderHistory() {
+  const counter = document.getElementById("mt-hist-count");
+  if (counter) counter.textContent = history.length ? "(" + history.length + ")" : "";
+
+  const list = document.getElementById("mt-hist-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!history.length) {
+    list.appendChild(div("mt-hist-empty", "Үг дарж орчуулаарай"));
+    return;
+  }
+
+  for (const h of history) {
+    const item = div("mt-hist-item", "");
+    const word = div("mt-hist-w", h.w);
+    if (h.n > 1) word.appendChild(div("mt-hist-n", "×" + h.n));
+    item.appendChild(word);
+    item.appendChild(div("mt-hist-t", h.t));
+    list.appendChild(item);
+  }
 }
 
 // ---------- Tooltip ----------
@@ -470,6 +798,7 @@ function showResultTooltip(data, x, y) {
   placeTooltip(el, x, y);
   armScrollHide();
   scheduleHide(HIDE_DELAY_MS);
+  addHistory(data.original, data.translation);
 }
 
 function showErrorTooltip(msg, x, y) {

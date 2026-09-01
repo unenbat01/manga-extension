@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="mn">
+  <head>
+    <meta charset="utf-8" />
+    <title>Орчуулсан үгс</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px 40px;
+        background: #fff;
+        color: #111;
+        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto,
+          sans-serif;
+        font-size: 12pt;
+      }
+      header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 2px solid #111;
+        padding-bottom: 10px;
+        margin-bottom: 18px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18pt;
+      }
+      .meta {
+        color: #555;
+        font-size: 10pt;
+        text-align: right;
+        white-space: nowrap;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        text-align: left;
+        font-size: 9pt;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #666;
+        border-bottom: 1px solid #bbb;
+        padding: 0 8px 6px;
+      }
+      tbody td {
+        padding: 7px 8px;
+        border-bottom: 1px solid #e5e5e5;
+        vertical-align: top;
+      }
+      tbody tr:nth-child(even) {
+        background: #fafafa;
+      }
+      .num {
+        width: 44px;
+        color: #999;
+        font-size: 10pt;
+      }
+      .word {
+        width: 34%;
+        font-weight: 600;
+      }
+      .times {
+        width: 60px;
+        text-align: right;
+        color: #555;
+        font-variant-numeric: tabular-nums;
+      }
+      #banner {
+        display: none;
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        background: #fef3c7;
+        border: 1px solid #fcd34d;
+        border-radius: 6px;
+        font-size: 10.5pt;
+        color: #78350f;
+      }
+      #banner button {
+        margin-left: 6px;
+        padding: 4px 12px;
+        font-size: 10pt;
+        font-weight: 600;
+        color: #78350f;
+        background: #fcd34d;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #print {
+        position: fixed;
+        top: 20px;
+        right: 24px;
+        padding: 9px 18px;
+        font-size: 11pt;
+        font-weight: 600;
+        color: #fff;
+        background: #2563eb;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #print:hover {
+        background: #1d4ed8;
+      }
+      .empty {
+        color: #777;
+        padding: 24px 0;
+      }
+
+      @media print {
+        body {
+          padding: 0;
+        }
+        #print,
+        #banner {
+          display: none !important;
+        }
+        thead {
+          display: table-header-group;
+        }
+        tr {
+          break-inside: avoid;
+        }
+        tbody tr:nth-child(even) {
+          background: transparent;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button id="print">PDF болгож хадгалах</button>
+
+    <div id="banner"></div>
+
+    <header>
+      <h1>Орчуулсан үгс</h1>
+      <div class="meta">
+        <div id="count"></div>
+        <div id="date"></div>
+      </div>
+    </header>
+
+    <div id="content"></div>
+
+    <script src="export.js"></script>
+  </body>
+</html>

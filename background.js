@@ -36,6 +36,7 @@ const handlers = {
   PROCESS_REGION: processRegion,
   TRANSLATE_WORD: translateWord,
   TRANSLATE_TEXT: translatePlain,
+  OPEN_EXPORT: openExport,
 };
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -183,6 +184,12 @@ async function processRegion(request, sender) {
 async function translateWord(request) {
   const result = await buildWordResult(request.word, request.context);
   return Object.assign(result, { source: "dom" });
+}
+
+// Орчуулсан үгсийн хэвлэх/PDF хуудсыг шинэ табд нээнэ
+async function openExport() {
+  await chrome.tabs.create({ url: chrome.runtime.getURL("export.html") });
+  return { ok: true };
 }
 
 async function translatePlain(request) {

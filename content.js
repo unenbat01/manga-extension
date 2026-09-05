@@ -2,11 +2,14 @@ const HIDE_DELAY_MS = 3000; // Хариу гарснаас хойш өөрөө �
 const SCROLL_HIDE_PX = 60; // Ийм зайд гүйлгэхэд popover алга болно
 const SETTINGS_KEY = "mtSettings";
 const HISTORY_KEY = "mtHistory";
+const DRAG_THRESHOLD = 8; // Ийм зайд хөдөлбөл чирэлт гэж үзнэ
+const HISTORY_MAX_WORDS = 4; // Түүхэд хэдэн үгтэй хүртэл хэллэг оруулах
 const HISTORY_MAX = 500; // Хадгалах үгийн дээд тоо (PDF-д бүгд орно)
 
 const state = {
   enabled: true,
   altOnly: false, // Зөвхөн Alt+click дарахад ажиллах
+  dragSelect: false, // Shift-гүйгээр зүгээр чирэхэд хэсэг сонгох
   collapsed: false,
   histCollapsed: false,
   panels: {}, // { topbox|history: { left, top, width, height } }
@@ -17,6 +20,8 @@ const state = {
 
 let dragStart = null;
 let dragBox = null;
+let pendingDrag = null; // Дарсан ч хараахан хөдлөөгүй байгаа цэг
+let suppressClick = false; // Чирсний дараах click-ийг үл тоох
 let scrollAnchor = null; // { win, els } — popover гарах үеийн гүйлгэлтийн байрлал
 let history = []; // [{ w, t }] — сүүлд орчуулсан үгс
 
@@ -58,6 +63,14 @@ async function init() {
   });
   window.addEventListener("resize", clampPanels);
   document.addEventListener("pointerdown", onPanelPointerDown, true);
+  // Зураг дээр чирэхэд хөтчийн drag-and-drop эхлэхээс сэргийлнэ
+  document.addEventListener(
+    "dragstart",
+    (e) => {
+      if (dragStart || pendingDrag) e.preventDefault();
+    },
+    true
+  );
 }
 
 function saveSettings() {
@@ -66,6 +79,7 @@ function saveSettings() {
       [SETTINGS_KEY]: {
         enabled: state.enabled,
         altOnly: state.altOnly,
+        dragSelect: state.dragSelect,
         collapsed: state.collapsed,
         histCollapsed: state.histCollapsed,
         panels: state.panels,
@@ -118,15 +132,23 @@ function shouldHandle(e) {
 
 // ---------- Хэсэг сонголт (Shift + чирэх) ----------
 function onMouseDown(e) {
-  if (isOurUI(e.target)) return;
+  if (isOurUI(e.target) || e.button !== 0) return;
 
-  if (state.enabled && e.shiftKey && e.button === 0) {
+  warmUpOnce();
+
+  // Shift+чирэх — үргэлж ажиллана, шууд эхэлнэ
+  if (state.enabled && e.shiftKey) {
     dragStart = { x: e.clientX, y: e.clientY };
     e.preventDefault();
     return;
   }
 
-  warmUpOnce();
+  // "Чирж сонгох" горим: одоохондоо зөвхөн цэгийг тэмдэглэнэ.
+  // Хулгана DRAG_THRESHOLD-оос хол хөдөлж байж хайрцаг гарна —
+  // ингэснээр энгийн товшилт хэвээрээ нэг үг орчуулна.
+  if (state.dragSelect && state.enabled && !isInteractive(e.target)) {
+    pendingDrag = { x: e.clientX, y: e.clientY };
+  }
 
   // click болтол background скриншотоо аваад бэлэн болгоно
   if (shouldHandle(e) && !wordFromDom(e.clientX, e.clientY)) {
@@ -138,7 +160,20 @@ function onMouseDown(e) {
 
 function onMouseMove(e) {
   warmUpOnce();
+
+  // Хангалттай хол хөдөлсөн бол товшилтоос чирэлт рүү шилжинэ
+  if (pendingDrag && !dragStart) {
+    const dx = e.clientX - pendingDrag.x;
+    const dy = e.clientY - pendingDrag.y;
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    dragStart = pendingDrag;
+    pendingDrag = null;
+  }
+
   if (!dragStart) return;
+  e.preventDefault(); // хуудасны текст сонгогдохгүй
+  document.body.classList.add("mt-dragging");
+
   if (!dragBox) {
     dragBox = document.createElement("div");
     dragBox.id = "manga-translator-dragbox";
@@ -152,6 +187,9 @@ function onMouseMove(e) {
 }
 
 function onMouseUp(e) {
+  pendingDrag = null;
+  document.body.classList.remove("mt-dragging");
+
   if (!dragStart) return;
   const r = rectOf(dragStart, { x: e.clientX, y: e.clientY });
   dragStart = null;
@@ -159,7 +197,10 @@ function onMouseUp(e) {
     dragBox.remove();
     dragBox = null;
   }
+  // Хэт жижиг бол товшилт гэж үзээд ердийн замаар явуулна
   if (r.width < 12 || r.height < 8) return;
+
+  suppressClick = true;
 
   const reqId = ++state.reqId;
   showLoadingTooltip(r.left, r.top + r.height);
@@ -186,6 +227,10 @@ function rectOf(a, b) {
 
 // ---------- Товших ----------
 function onClick(e) {
+  if (suppressClick) {
+    suppressClick = false; // Чирсний дараах click — үг орчуулахгүй
+    return;
+  }
   if (!shouldHandle(e)) return;
 
   const sel = window.getSelection();
@@ -318,14 +363,19 @@ function injectTopBoxUI() {
     </div>
     <div id="mt-body">
       <textarea id="mt-text-input" placeholder="Англи текст эсвэл өгүүлбэр бичих..."></textarea>
-      <div class="mt-topbox-row">
+      <div class="mt-opts">
         <label class="mt-check">
           <input type="checkbox" id="mt-alt-only" /> Alt+click
         </label>
+        <label class="mt-check">
+          <input type="checkbox" id="mt-drag-select" /> Чирж сонгох
+        </label>
+      </div>
+      <div class="mt-topbox-row">
         <button id="mt-translate-btn">Орчуулах</button>
       </div>
       <div id="mt-text-result" style="display: none;"></div>
-      <div class="mt-hint">Shift+чирэх = бүтэн бөмбөлөг</div>
+      <div class="mt-hint" id="mt-hint"></div>
     </div>
   `;
   document.body.appendChild(box);
@@ -357,6 +407,21 @@ function injectTopBoxUI() {
   altOnly.checked = state.altOnly;
   altOnly.addEventListener("change", () => {
     state.altOnly = altOnly.checked;
+    saveSettings();
+  });
+
+  const dragSel = box.querySelector("#mt-drag-select");
+  const hint = box.querySelector("#mt-hint");
+  const applyHint = () => {
+    hint.textContent = state.dragSelect
+      ? "Чирэх = хэсэг сонгох · товших = нэг үг"
+      : "Shift+чирэх = хэсэг сонгох";
+  };
+  dragSel.checked = state.dragSelect;
+  applyHint();
+  dragSel.addEventListener("change", () => {
+    state.dragSelect = dragSel.checked;
+    applyHint();
     saveSettings();
   });
 
@@ -661,7 +726,9 @@ function injectHistoryUI() {
 function addHistory(word, translation) {
   const w = (word || "").trim();
   const t = (translation || "").trim();
-  if (!w || !t || /\s/.test(w)) return;
+  if (!w || !t) return;
+  // Ганц үг эсвэл богино хэллэг л жагсаалтад орно (бүтэн өгүүлбэр орохгүй)
+  if (w.split(/\s+/).length > HISTORY_MAX_WORDS) return;
 
   // Давхардвал устгахгүй — хэдэн удаа хайснаа тоолж, дээш нь гаргана
   const key = w.toLowerCase();

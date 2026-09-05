@@ -205,15 +205,27 @@ async function recognizeRegion(worker, bitmap, data) {
   const r = data.rect;
   const dpr = data.devicePixelRatio || 1;
 
+  const cx = (r.left + r.width / 2) * dpr;
+  const cy = (r.top + r.height / 2) * dpr;
+
+  // Жижиг сонголт (1-2 үг) томруулахгүй бол муу уншигдана — үгтэй ижил
+  // адаптив томруулалтыг энд ч хэрэглэнэ
+  const metrics = estimateLine(bitmap, cx, cy, dpr);
+  const lineH = metrics ? metrics.lineH : FALLBACK_LINE_CSS * dpr;
+
   const base = {
-    cx: (r.left + r.width / 2) * dpr,
-    cy: (r.top + r.height / 2) * dpr,
+    cx,
+    cy,
     wDev: r.width * dpr,
     hDev: r.height * dpr,
+    scale: clamp(TARGET_LINE_PX / lineH, 1, 4),
     maxPixels: MAX_REGION_PX,
   };
 
-  const rendered = renderCrop(bitmap, Object.assign({}, base, { inkDark: null }));
+  const rendered = renderCrop(
+    bitmap,
+    Object.assign({}, base, { inkDark: metrics ? metrics.inkDark : null })
+  );
   let text = cleanBlock((await ocr(worker, rendered.canvas)).data.text || "");
 
   if (!text) {

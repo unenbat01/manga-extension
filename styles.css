@@ -131,12 +131,20 @@ body.mt-dragging #manga-translator-history {
   border-color: #89b4fa;
 }
 
+.mt-opts {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 .mt-topbox-row {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
 }
 
 .mt-check {

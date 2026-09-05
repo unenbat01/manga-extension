@@ -454,7 +454,10 @@ function injectTopBoxUI() {
       btn.disabled = false;
       resultDiv.style.display = "block";
       if (res && res.success) {
-        resultDiv.textContent = res.data.translation;
+        resultDiv.textContent = "";
+        resultDiv.appendChild(div("mt-panel-trans", res.data.translation));
+        const senses = sensesBox(res.data.senses);
+        if (senses) resultDiv.appendChild(senses);
         lastTranslated = text;
         addHistory(text, res.data.translation);
       } else {
@@ -847,13 +850,21 @@ function showResultTooltip(data, x, y) {
   const el = getOrCreateTooltip();
   el.innerHTML = "";
 
-  el.appendChild(div("mt-word", data.original));
+  const head = div("mt-word", data.original);
+  // Хувирсан хэлбэр байвал үндсэн хэлбэрийг нь хажууд нь харуулна
+  if (data.lemma) head.appendChild(span("mt-lemma", "← " + data.lemma));
+  el.appendChild(head);
+
   el.appendChild(div("mt-divider", ""));
   el.appendChild(div("mt-trans", data.translation));
 
   if (data.alts && data.alts.length) {
     el.appendChild(div("mt-alts", data.alts.join(", ")));
   }
+
+  // Үгийн төрөл тус бүрийн утга, тайлбартайгаа
+  const senses = sensesBox(data.senses);
+  if (senses) el.appendChild(senses);
 
   if (data.contextTranslation && data.context) {
     const ctx = div("mt-context", "");
@@ -884,4 +895,28 @@ function div(cls, text) {
   d.className = cls;
   if (text) d.textContent = text;
   return d;
+}
+
+function span(cls, text) {
+  const s = document.createElement("span");
+  s.className = cls;
+  if (text) s.textContent = text;
+  return s;
+}
+
+// "нэр үг · банк" + англи тайлбарын орчуулга — утгыг ялгаж сонгоход туслана
+function sensesBox(senses) {
+  if (!senses || !senses.length) return null;
+
+  const box = div("mt-senses", "");
+  for (const s of senses) {
+    const row = div("mt-sense", "");
+    const top = div("mt-sense-top", "");
+    if (s.pos) top.appendChild(span("mt-sense-pos", s.pos));
+    if (s.word) top.appendChild(span("mt-sense-w", s.word));
+    if (top.childNodes.length) row.appendChild(top);
+    if (s.def) row.appendChild(div("mt-sense-def", s.def));
+    if (row.childNodes.length) box.appendChild(row);
+  }
+  return box.childNodes.length ? box : null;
 }

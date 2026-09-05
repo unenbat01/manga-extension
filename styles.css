@@ -324,6 +324,58 @@ body.mt-dragging #manga-translator-history {
   line-height: 1.4;
 }
 
+/* Үндсэн хэлбэр: running ← run */
+.mt-lemma {
+  margin-left: 6px;
+  color: #6c7086;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* Үгийн төрөл бүрийн утга */
+.mt-senses {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mt-sense + .mt-sense {
+  margin-top: 6px;
+}
+
+.mt-sense-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.mt-sense-pos {
+  flex: 0 0 auto;
+  color: #f9e2af;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+}
+
+.mt-sense-w {
+  color: #cdd6f4;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.mt-sense-def {
+  margin-top: 1px;
+  color: #7f849c;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* Зүүн дээд самбарын үр дүн */
+.mt-panel-trans {
+  color: #cdd6f4;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .mt-context {
   margin-top: 8px;
   padding-top: 7px;
